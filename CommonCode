@@ -1,0 +1,181 @@
+一般常见安装的系统为CentOS和Debian系统
+
+安装Wget工具
+yum -y install wget    ##ContOS Yum 安装 wget
+apt-get install wget   ##Debian Ubuntu 安装 wget
+
+安装Curl工具
+apt-get update -y && apt-get install curl -y    ##Ubuntu/Debian 系统安装 Curl 方法
+yum update -y && yum install curl -y            ##Centos 系统安装 Curl 方法
+
+安装XZ压缩工具
+apt-get install xz-utils   #Debian/Ubuntu 安装 XZ 压缩工具命令
+yum install xz    #CentOS 安装 XZ 压缩工具
+
+更新系统
+apt-get update  #Debian更新
+yum update  #CentOS更新
+
+安装NGINX
+apt-get -y install  nginx wget unzip zip curl tar   #Debian安装
+yum -y install  nginx wget unzip zip curl tar   #CentOS安装
+systemctl enable nginx.service    #设置Nginx开机启动
+
+配置Nginx
+找到 路径 /etc/nginx/nginx.conf 替换原有代码
+
+user  root;
+worker_processes  1;
+error_log  /var/log/nginx/error.log warn;
+pid        /var/run/nginx.pid;
+events {
+    worker_connections  1024;
+}
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+    log_format  main  '\$remote_addr - \$remote_user [\$time_local] "\$request" '
+                      '\$status \$body_bytes_sent "\$http_referer" '
+                      '"\$http_user_agent" "\$http_x_forwarded_for"';
+    access_log  /var/log/nginx/access.log  main;
+    sendfile        on;
+    #tcp_nopush     on;
+    keepalive_timeout  120;
+    client_max_body_size 20m;
+    #gzip  on;
+    server {
+        listen       80;
+        server_name  $your_domain;
+        root /usr/share/nginx/html;
+        index index.php index.html index.htm;
+    }
+}
+
+
+设置伪装站点
+rm -rf /usr/share/nginx/html/*   #删除目录原有文件
+cd /usr/share/nginx/html/    #进入站点更目录
+wget https://github.com/V2RaySSR/Trojan/raw/master/web.zip
+unzip web.zip
+systemctl restart nginx.service
+到这里，你访问http://你的域名 ，应该可以打开网站了。（不是https://）
+
+下载Trojan服务器
+Trojan服务端的最新地址如下（若是有更新，请自行替换下面https://后面的内容）
+cd /usr/src  #进入该目录
+wget https://github.com/trojan-gfw/trojan/releases/download/v1.14.0/trojan-1.14.0-linux-amd64.tar.xz    #下载官方Trojan服务器
+tar xf trojan-1.*   #解压该文件
+
+创建Trojan服务器配置文件
+找到 /usr/src/trojan/ 目录，创建并打开server.conf文件，写入以下内容
+
+{
+    "run_type": "server",
+    "local_addr": "0.0.0.0",
+    "local_port": 443,
+    "remote_addr": "127.0.0.1",
+    "remote_port": 80,
+    "password": [
+        "00000000"
+    ],
+    "log_level": 1,
+    "ssl": {
+        "cert": "/usr/src/trojan-cert/fullchain.cer",
+        "key": "/usr/src/trojan-cert/private.key",
+        "key_password": "",
+        "cipher_tls13":"TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_256_GCM_SHA384",
+	"prefer_server_cipher": true,
+        "alpn": [
+            "http/1.1"
+        ],
+        "reuse_session": true,
+        "session_ticket": false,
+        "session_timeout": 600,
+        "plain_http_response": "",
+        "curves": "",
+        "dhparam": ""
+    },
+    "tcp": {
+        "no_delay": true,
+        "keep_alive": true,
+        "fast_open": false,
+        "fast_open_qlen": 20
+    },
+    "mysql": {
+        "enabled": false,
+        "server_addr": "127.0.0.1",
+        "server_port": 3306,
+        "database": "trojan",
+        "username": "trojan",
+        "password": ""
+    }
+}
+
+创建Trojan自启服务
+Debian系统找到/lib/systemd/system/目录，并创建trojan.service文件
+CentOS系统找到/usr/lib/systemd/system/目录，并创建trojan.service文件
+打开trojan.service文件，并写入以下代码
+
+[Unit]  
+Description=trojan  
+After=network.target  
+   
+[Service]  
+Type=simple  
+PIDFile=/usr/src/trojan/trojan/trojan.pid
+ExecStart=/usr/src/trojan/trojan -c "/usr/src/trojan/server.conf"  
+ExecReload=  
+ExecStop=/usr/src/trojan/trojan  
+PrivateTmp=true  
+   
+[Install]  
+WantedBy=multi-user.target
+
+申请证书
+打开网页 https://freessl.cn/ ,填入你需要申请证书的二级域名。点击创建免费的SSL证书，可以选择 Let’s Encrypt 与 TrustAsia CA 的两种证书，
+
+刚才的准备工作完成的小伙伴应该会提示如下图，点击打开KeyManager
+
+输入你创建的主密码，进入KeyManager软件
+
+下载并解压证书
+得到两个文件。
+一个是xxx.xxx.xxx_chain.crt 文件
+一个是xxx.xxx.xxx_key.key 文件
+把xxx.xxx.xxx_chain.crt改名为fullchain.cer备用
+把xxx.xxx.xxx_key.key改名为private.key备用
+
+移动证书文件
+创建存放证书的文件夹trojan-cert 完整路径为 /usr/src/trojan-cert
+把刚才改名的2个文件（fullchain.cer和private.key）放到VPS /usr/src/trojan-cert目录下面
+
+启动Trojan服务
+设置启动Trojan服务
+
+systemctl start trojan.service  #启动Trojan
+systemctl enable trojan.service  #设置Trojan服务开机自启
+验证SSL证书
+访问 https://你的域名 ，检查证书和Trojan是否正常运行（有小锁成功）。记得是访问 https:// 不是 http://
+
+下载Trojan客户端软件
+Trojan项目地址：点击访问
+
+Trojan快速下载：点击下载（Win） 点击下载（MacOS）
+
+Win系统不想要Trojan的小黑窗，可以创建如下批处理运行Trojan.exe文件
+
+命令如下
+start.bat 启动Trojan服务
+
+@ECHO OFF
+%1 start mshta vbscript:createobject("wscript.shell").run("""%~0"" ::",0)(window.close)&&exit
+start /b trojan.exe
+stop.bat 停止Trojan服务
+
+@ECHO OFF
+taskkill /im trojan.exe /f
+ping -n 2 127.1 >nul
+把上述两个.bat文件，放在Trojan文件夹根目录下面，保证和Trojan.exe位于同一目录。
+
+配置Trojan客户端
+
