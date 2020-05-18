@@ -1,6 +1,7 @@
 #!/bin/bash
 # Author: Jrohy
 # github: https://github.com/Jrohy/trojan
+# 补充信息：可多用户管理，带管理界面，无加速BBR
 
 #定义操作变量, 0为否, 1为是
 HELP=0
